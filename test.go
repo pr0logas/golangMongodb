@@ -1,71 +1,83 @@
 package main
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/globalsign/mgo"
 	"github.com/globalsign/mgo/bson"
-	//log "github.com/sirupsen/logrus"
-	"encoding/json"
 )
 
 const (
-	url        = "localhost"
-	database   = "adeptio"
+	url                  = "localhost"
+	database, collection = "adeptio", "blocks"
 )
 
+type (
+	JsonAggregation struct {
+		Block         int    `json:"block"`
+		Hash          string `json:"hash"`
+		Confirmations int    `json:"confirmations"`
+		Time          int    `json:"time"`
+	}
+)
+
+var results []interface{}
+var orderItems []JsonAggregation
+
 func main() {
-	// Main Connect dial;
-	session, err := mgo.Dial(url)
-	if err != nil {
-		panic("Database not working?")
-	}
-
-	// Close socket at the end of the process;
-	defer session.Close()
-	fmt.Printf("Succesfully connected to mongoDB. Server endpoint: %v", url)
-
-	// Get DatabaseNames;
-	/*dbName, err := session.DatabaseNames()
-	if err != nil {
-		log.Warn(err)
-	}
-
-	// Loop database names and print out'
-	for _, v := range dbName {
-		fmt.Printf("\n[%3v]", v)
-	}*/
-
-	// Connect to specified databaseName from const;
-	db := session.DB(database)
-
-	// Get Collections;
-	//collection, err := db.CollectionNames()
-
-	var results []interface{}
-
-	coll := db.C("blocks")
+	mongoSession()
 
 	//query := coll.Find(nil).All(&results)
 	//query := coll.Find(bson.M{"block": 1}).All(&results)
 	//query := coll.Find(bson.D{ {"block", bson.D{{"$lt", 100000}}} }).All(&results)
-	query := coll.Find(bson.D{ {"block", 1} }).All(&results)
+	//query := coll.Find(bson.D{ {"block", 1} }).All(&results)
 
-    if query != nil {
-        // TODO: Do something about the error
-    } else {
-        //fmt.Println("Results All: ", results) 
-        jsonString, err := json.Marshal(results)
-		fmt.Println(err)
-		fmt.Println(string(jsonString))
-    }
+	// Aggregate query
+	jsonString, err := json.Marshal(results)
+		if err != nil {
+			panic("FATAL, got Error while getting the results from MongoDB")
+		} else if string(jsonString) == "null" {
+			panic("FATAL, returned empty data from MongoDB (null)")
+		} else {
 
-	// Loop and printOur collections;
-	/*fmt.Printf("\nCollections:\n")
-	for _, v:= range collection {
-		fmt.Printf("\n[%3v]", v)
+			err := json.Unmarshal(jsonString, &orderItems)
+			if err != nil {
+				panic("FATAL")
+			}
+			assignJsonValues()
+			}
+		}
+
+	func mongoSession() {
+		// Main Connect dial;
+		session, err := mgo.Dial(url)
+		if err != nil {
+			panic("MongoDB not working?")
+		}
+		// Close socket at the end of the process;
+		defer session.Close()
+
+		startColBlocksQuery("block", 1, session)
 	}
-	*/
 
+	func startColBlocksQuery(name string, value int, session *mgo.Session) {
+		db := session.DB(database)
+		coll := db.C(collection)
+		query := coll.Find(bson.D{ {name, value} }).All(&results)
+		if query != nil {
+			panic("No content in DB")
+		}
+	}
 
-
+	func assignJsonValues() {
+		for _, orderItem := range orderItems {
+		hash := orderItem.Hash
+		block := orderItem.Block
+		confirmations := orderItem.Confirmations
+		time := orderItem.Time
+		fmt.Println(hash)
+		fmt.Println(block)
+		fmt.Println(confirmations)
+		fmt.Println(time)
+	}
 }
